@@ -35,6 +35,7 @@ import {
 
 import EpisodeSelector from '@/components/EpisodeSelector';
 import PageLayout from '@/components/PageLayout';
+import PlayerGestureLayer from '@/components/PlayerGestureLayer';
 
 function readStoredNumber(key: string, fallback: number): number {
   if (typeof window === 'undefined') return fallback;
@@ -1808,6 +1809,12 @@ function PlayPageClient() {
                   ref={artRef}
                   className='bg-black w-full h-full rounded-xl overflow-hidden shadow-lg'
                 ></div>
+
+                {/* 页面内播放器手势：长按3倍速、横滑快进快退、左滑亮度、右滑音量 */}
+                <PlayerGestureLayer
+                  getPlayer={() => artPlayerRef.current}
+                  enabled={!!videoUrl && !isVideoLoading && !resumePrompt}
+                />
 
                 {/* 画中画 / 投屏快捷按钮 */}
                 <div className='absolute top-3 right-3 z-[400] flex gap-2'>
