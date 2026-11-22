@@ -22,10 +22,14 @@ interface ApiSearchItem {
 
 export async function searchFromApi(
   apiSite: ApiSite,
-  query: string
+  query: string,
+  timeoutMs = 8000,
+  ignoreCircuit = false
 ): Promise<SearchResult[]> {
-  // 入口处二次检查熔断（其他调用方如 search/one 也可能触发）
-  if (isCircuitOpen(apiSite.key)) return [];
+  // 入口处二次检查熔断（健康探测可显式跳过，以验证是否已恢复）
+  if (!ignoreCircuit && isCircuitOpen(apiSite.key)) return [];
+
+  const startedAt = Date.now();
 
   try {
     const apiBaseUrl = apiSite.api;
@@ -35,7 +39,7 @@ export async function searchFromApi(
 
     // 添加超时处理
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(apiUrl, {
       headers: API_CONFIG.search.headers,
@@ -57,11 +61,11 @@ export async function searchFromApi(
       data.list.length === 0
     ) {
       // 正常返回但无结果（该源确实没有此资源），不算失败
-      recordSuccess(apiSite.key);
+      recordSuccess(apiSite.key, Date.now() - startedAt);
       return [];
     }
     // 接口可用，重置失败计数
-    recordSuccess(apiSite.key);
+    recordSuccess(apiSite.key, Date.now() - startedAt);
     // 处理第一页结果
     const results = data.list.map((item: ApiSearchItem) => {
       let episodes: string[] = [];

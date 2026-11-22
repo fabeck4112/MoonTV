@@ -1,6 +1,6 @@
 'use client';
 
-import { Clover, Film, Home, Search, Tv } from 'lucide-react';
+import { Activity, Film, Home, Library, Search, Tv } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -20,6 +20,7 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
   const navItems = [
     { icon: Home, label: '首页', href: '/' },
     { icon: Search, label: '搜索', href: '/search' },
+    { icon: Library, label: '片库', href: '/library' },
     {
       icon: Film,
       label: '电影',
@@ -31,9 +32,9 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       href: '/douban?type=tv',
     },
     {
-      icon: Clover,
-      label: '综艺',
-      href: '/douban?type=show',
+      icon: Activity,
+      label: '源状态',
+      href: '/sources',
     },
   ];
 
@@ -46,6 +47,8 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
 
     return (
       decodedActive === decodedItemHref ||
+      (href === '/library' && decodedActive.startsWith('/library')) ||
+      (href === '/sources' && decodedActive.startsWith('/sources')) ||
       (decodedActive.startsWith('/douban') &&
         decodedActive.includes(`type=${typeMatch}`))
     );
@@ -64,10 +67,10 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
         {navItems.map((item) => {
           const active = isActive(item.href);
           return (
-            <li key={item.href} className='flex-shrink-0 w-1/5'>
+            <li key={item.href} className='w-1/6 flex-shrink-0'>
               <Link
                 href={item.href}
-                className='flex flex-col items-center justify-center w-full h-14 gap-1 text-xs'
+                className='flex h-14 w-full flex-col items-center justify-center gap-1 text-[11px]'
               >
                 <item.icon
                   className={`h-6 w-6 ${

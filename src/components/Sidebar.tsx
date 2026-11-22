@@ -1,6 +1,15 @@
 'use client';
 
-import { Clover, Film, Home, Menu, Search, Tv } from 'lucide-react';
+import {
+  Activity,
+  Clover,
+  Film,
+  Home,
+  Library,
+  Menu,
+  Search,
+  Tv,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -138,6 +147,16 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       label: '综艺',
       href: '/douban?type=show',
     },
+    {
+      icon: Library,
+      label: '我的片库',
+      href: '/library',
+    },
+    {
+      icon: Activity,
+      label: '数据源健康',
+      href: '/sources',
+    },
   ];
 
   return (
@@ -232,6 +251,10 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
 
                   const isActive =
                     decodedActive === decodedItemHref ||
+                    (item.href === '/library' &&
+                      decodedActive.startsWith('/library')) ||
+                    (item.href === '/sources' &&
+                      decodedActive.startsWith('/sources')) ||
                     (decodedActive.startsWith('/douban') &&
                       decodedActive.includes(`type=${typeMatch}`) &&
                       tagMatch &&

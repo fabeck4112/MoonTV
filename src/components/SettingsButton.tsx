@@ -6,6 +6,17 @@ import { Settings, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import {
+  DEFAULT_PLAYBACK_SETTINGS,
+  getPlaybackSettings,
+  PLAYBACK_SETTINGS_EVENT,
+  PlaybackSettings,
+  resetPlaybackSettings,
+  savePlaybackSettings,
+} from '@/lib/user-settings';
+
+import { Toggle } from './UiPrimitives';
+
 export const SettingsButton: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [defaultAggregateSearch, setDefaultAggregateSearch] = useState(true);
@@ -13,6 +24,9 @@ export const SettingsButton: React.FC = () => {
   const [imageProxyUrl, setImageProxyUrl] = useState('');
   const [enableOptimization, setEnableOptimization] = useState(true);
   const [enableImageProxy, setEnableImageProxy] = useState(false);
+  const [playbackSettings, setPlaybackSettings] = useState<PlaybackSettings>(
+    DEFAULT_PLAYBACK_SETTINGS
+  );
   const [mounted, setMounted] = useState(false);
 
   // 确保组件已挂载
@@ -57,7 +71,22 @@ export const SettingsButton: React.FC = () => {
       if (savedEnableOptimization !== null) {
         setEnableOptimization(JSON.parse(savedEnableOptimization));
       }
+
+      setPlaybackSettings(getPlaybackSettings());
     }
+
+    const handlePlaybackSettingsUpdate = (event: Event) => {
+      setPlaybackSettings((event as CustomEvent<PlaybackSettings>).detail);
+    };
+    window.addEventListener(
+      PLAYBACK_SETTINGS_EVENT,
+      handlePlaybackSettingsUpdate
+    );
+    return () =>
+      window.removeEventListener(
+        PLAYBACK_SETTINGS_EVENT,
+        handlePlaybackSettingsUpdate
+      );
   }, []);
 
   // 保存设置到 localStorage
@@ -96,6 +125,10 @@ export const SettingsButton: React.FC = () => {
     }
   };
 
+  const updatePlaybackSettings = (patch: Partial<PlaybackSettings>) => {
+    setPlaybackSettings(savePlaybackSettings(patch));
+  };
+
   const handleSettingsClick = () => {
     setIsOpen(!isOpen);
   };
@@ -114,6 +147,7 @@ export const SettingsButton: React.FC = () => {
     setDoubanProxyUrl('');
     setEnableImageProxy(!!defaultImageProxy);
     setImageProxyUrl(defaultImageProxy);
+    setPlaybackSettings(resetPlaybackSettings());
 
     // 保存到 localStorage
     if (typeof window !== 'undefined') {
@@ -138,7 +172,7 @@ export const SettingsButton: React.FC = () => {
       />
 
       {/* 设置面板 */}
-      <div className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-xl z-[1001] p-6'>
+      <div className='fixed top-1/2 left-1/2 max-h-[90vh] w-full max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900 z-[1001]'>
         {/* 标题栏 */}
         <div className='flex items-center justify-between mb-6'>
           <div className='flex items-center gap-3'>
@@ -186,6 +220,107 @@ export const SettingsButton: React.FC = () => {
                 <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
               </div>
             </label>
+          </div>
+
+          {/* 播放体验 */}
+          <div className='space-y-4 rounded-xl border border-gray-200/80 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-800/40'>
+            <h4 className='text-sm font-semibold text-gray-800 dark:text-gray-200'>
+              播放体验
+            </h4>
+            <Toggle
+              label='自动连播下一集'
+              checked={playbackSettings.autoNext}
+              onChange={(value) => updatePlaybackSettings({ autoNext: value })}
+            />
+            <div className='grid grid-cols-3 gap-2'>
+              <label className='block'>
+                <span className='mb-1 block text-xs text-gray-500 dark:text-gray-400'>
+                  提前切换（秒）
+                </span>
+                <input
+                  type='number'
+                  min={0}
+                  max={30}
+                  value={playbackSettings.autoNextLeadSeconds}
+                  onChange={(e) =>
+                    updatePlaybackSettings({
+                      autoNextLeadSeconds: Math.min(
+                        30,
+                        Math.max(0, Number(e.target.value) || 0)
+                      ),
+                    })
+                  }
+                  className='w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+                />
+              </label>
+              <label className='block'>
+                <span className='mb-1 block text-xs text-gray-500 dark:text-gray-400'>
+                  跳过片头（秒）
+                </span>
+                <input
+                  type='number'
+                  min={0}
+                  max={600}
+                  value={playbackSettings.skipIntroSeconds}
+                  onChange={(e) =>
+                    updatePlaybackSettings({
+                      skipIntroSeconds: Math.min(
+                        600,
+                        Math.max(0, Number(e.target.value) || 0)
+                      ),
+                    })
+                  }
+                  className='w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+                />
+              </label>
+              <label className='block'>
+                <span className='mb-1 block text-xs text-gray-500 dark:text-gray-400'>
+                  跳过片尾（秒）
+                </span>
+                <input
+                  type='number'
+                  min={0}
+                  max={600}
+                  value={playbackSettings.skipOutroSeconds}
+                  onChange={(e) =>
+                    updatePlaybackSettings({
+                      skipOutroSeconds: Math.min(
+                        600,
+                        Math.max(0, Number(e.target.value) || 0)
+                      ),
+                    })
+                  }
+                  className='w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+                />
+              </label>
+            </div>
+            <div className='flex flex-wrap gap-x-5 gap-y-2'>
+              <Toggle
+                label='记住音量'
+                checked={playbackSettings.rememberVolume}
+                onChange={(value) =>
+                  updatePlaybackSettings({ rememberVolume: value })
+                }
+              />
+              <Toggle
+                label='记住倍速'
+                checked={playbackSettings.rememberRate}
+                onChange={(value) =>
+                  updatePlaybackSettings({ rememberRate: value })
+                }
+              />
+              <Toggle
+                label='扩展快捷键'
+                checked={playbackSettings.shortcutsEnabled}
+                onChange={(value) =>
+                  updatePlaybackSettings({ shortcutsEnabled: value })
+                }
+              />
+            </div>
+            <p className='text-xs leading-relaxed text-gray-500 dark:text-gray-400'>
+              快捷键：空格播放/暂停 · ←→ 快退/快进 · ↑↓ 音量 · Alt+←→ 切集 · F
+              全屏 · M 静音 · [ ] 倍速
+            </p>
           </div>
 
           {/* 优选和测速 */}
