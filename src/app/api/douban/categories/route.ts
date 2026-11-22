@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getCacheTime } from '@/lib/config';
 import { DoubanItem, DoubanResult } from '@/lib/types';
+import { parseDoubanRegion } from '@/lib/utils';
 
 interface DoubanCategoryApiResponse {
   total: number;
@@ -108,6 +109,7 @@ export async function GET(request: Request) {
       poster: item.pic?.normal || item.pic?.large || '',
       rate: item.rating?.value ? item.rating.value.toFixed(1) : '',
       year: item.card_subtitle?.match(/(\d{4})/)?.[1] || '',
+      region: parseDoubanRegion(item.card_subtitle),
     }));
 
     const response: DoubanResult = {

@@ -1,4 +1,5 @@
 import { DoubanItem, DoubanResult } from './types';
+import { parseDoubanRegion } from './utils';
 
 interface DoubanCategoriesParams {
   kind: 'tv' | 'movie';
@@ -120,6 +121,7 @@ export async function fetchDoubanCategories(
       poster: item.pic?.normal || item.pic?.large || '',
       rate: item.rating?.value ? item.rating.value.toFixed(1) : '',
       year: item.card_subtitle?.match(/(\d{4})/)?.[1] || '',
+      region: parseDoubanRegion(item.card_subtitle),
     }));
 
     return {

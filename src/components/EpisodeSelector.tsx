@@ -40,6 +40,10 @@ interface EpisodeSelectorProps {
   sourceSearchError?: string | null;
   /** 预计算的测速结果，避免重复测速 */
   precomputedVideoInfo?: Map<string, VideoInfo>;
+  /** 已观看过的集数（0 基索引） */
+  watchedEpisodes?: number[];
+  /** 跳到下一个未看集的回调 */
+  onJumpToUnwatched?: () => void;
 }
 
 /**
@@ -58,9 +62,12 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   sourceSearchLoading = false,
   sourceSearchError = null,
   precomputedVideoInfo,
+  watchedEpisodes = [],
+  onJumpToUnwatched,
 }) => {
   const router = useRouter();
   const pageCount = Math.ceil(totalEpisodes / episodesPerPage);
+  const watchedSet = useMemo(() => new Set(watchedEpisodes), [watchedEpisodes]);
 
   // 存储每个源的视频信息
   const [videoInfoMap, setVideoInfoMap] = useState<Map<string, VideoInfo>>(
@@ -342,6 +349,16 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                 })}
               </div>
             </div>
+            {/* 跳到下一个未看集 */}
+            {onJumpToUnwatched && watchedSet.size > 0 && (
+              <button
+                title='跳到下一个未看集'
+                onClick={onJumpToUnwatched}
+                className='flex-shrink-0 h-8 rounded-md px-2 text-xs flex items-center justify-center gap-1 text-green-700 hover:text-green-800 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 transition-colors transform translate-y-[-4px]'
+              >
+                未看
+              </button>
+            )}
             {/* 向上/向下按钮 */}
             <button
               className='flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-gray-700 hover:text-green-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-green-400 dark:hover:bg-white/20 transition-colors transform translate-y-[-4px]'
@@ -376,11 +393,13 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
               return episodes;
             })().map((episodeNumber) => {
               const isActive = episodeNumber === value;
+              const isWatched = watchedSet.has(episodeNumber - 1);
               return (
                 <button
                   key={episodeNumber}
                   onClick={() => handleEpisodeClick(episodeNumber - 1)}
-                  className={`h-10 flex items-center justify-center text-sm font-medium rounded-md transition-all duration-200 
+                  title={isWatched ? '已看' : undefined}
+                  className={`relative h-10 flex items-center justify-center text-sm font-medium rounded-md transition-all duration-200 
                     ${
                       isActive
                         ? 'bg-green-500 text-white shadow-lg shadow-green-500/25 dark:bg-green-600'
@@ -388,6 +407,12 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                     }`.trim()}
                 >
                   {episodeNumber}
+                  {isWatched && !isActive && (
+                    <span className='absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400' />
+                  )}
+                  {isWatched && isActive && (
+                    <span className='absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-white' />
+                  )}
                 </button>
               );
             })}

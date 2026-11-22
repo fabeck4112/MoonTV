@@ -2,6 +2,7 @@
 'use client';
 
 import {
+  BarChart3,
   CheckSquare,
   Download,
   Heart,
@@ -9,10 +10,18 @@ import {
   Search,
   Square,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   clearAllFavorites,
@@ -23,6 +32,8 @@ import {
   getAllFavorites,
   getAllPlayRecords,
   PlayRecord,
+  saveFavorite,
+  savePlayRecord,
   subscribeToDataUpdates,
 } from '@/lib/db.client';
 import { processImageUrl } from '@/lib/utils';
@@ -89,6 +100,7 @@ function LibraryPageClient() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -274,6 +286,67 @@ function LibraryPageClient() {
     URL.revokeObjectURL(url);
   };
 
+  const importData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      setBusy(true);
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        type?: string;
+        items?: LibraryItem[];
+      };
+      const items = Array.isArray(parsed.items) ? parsed.items : [];
+      if (!items.length) {
+        window.alert('文件中没有可导入的数据');
+        return;
+      }
+      let count = 0;
+      for (const item of items) {
+        if (!item.source || !item.id || !item.title) continue;
+        if (parsed.type === 'favorites') {
+          await saveFavorite(item.source, item.id, {
+            source_name: item.sourceName || item.source,
+            total_episodes: item.totalEpisodes || 1,
+            title: item.title,
+            year: item.year || '',
+            cover: item.cover || '',
+            save_time: item.saveTime || Date.now(),
+            search_title: item.searchTitle || item.title,
+          });
+        } else if (parsed.type === 'records') {
+          await savePlayRecord(item.source, item.id, {
+            title: item.title,
+            source_name: item.sourceName || item.source,
+            cover: item.cover || '',
+            year: item.year || '',
+            index: item.index || 1,
+            total_episodes: item.totalEpisodes || 1,
+            play_time: item.playTime || 0,
+            total_time: item.totalTime || 0,
+            save_time: item.saveTime || Date.now(),
+            search_title: item.searchTitle || item.title,
+          });
+        }
+        count++;
+      }
+      window.alert(`成功导入 ${count} 条数据（与现有数据冲突的将被覆盖）`);
+      // 刷新当前 tab 数据
+      const [favs, plays] = await Promise.all([
+        getAllFavorites(),
+        getAllPlayRecords(),
+      ]);
+      setFavorites(favs || {});
+      setRecords(plays || {});
+    } catch (err) {
+      console.error('导入失败', err);
+      window.alert('导入失败，请确认文件格式正确');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const getPlayHref = (item: LibraryItem) => {
     const params = new URLSearchParams({
       source: item.source,
@@ -292,14 +365,40 @@ function LibraryPageClient() {
           title='我的片库'
           subtitle='集中管理收藏与观看记录，支持搜索、批量删除和数据导出'
           action={
-            <button
-              onClick={exportData}
-              disabled={!allItems.length}
-              className='inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white/80 px-3 text-sm text-gray-700 transition-colors hover:border-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
-            >
-              <Download className='h-4 w-4' />
-              导出 JSON
-            </button>
+            <div className='flex items-center gap-2'>
+              <Link
+                href='/stats'
+                title='观看统计'
+                className='inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white/80 px-3 text-sm text-gray-700 transition-colors hover:border-green-400 hover:text-green-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+              >
+                <BarChart3 className='h-4 w-4' />
+                统计
+              </Link>
+              <input
+                ref={fileInputRef}
+                type='file'
+                accept='application/json,.json'
+                onChange={importData}
+                className='hidden'
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+                title='导入同类型备份文件'
+                className='inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white/80 px-3 text-sm text-gray-700 transition-colors hover:border-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+              >
+                <Upload className='h-4 w-4' />
+                导入
+              </button>
+              <button
+                onClick={exportData}
+                disabled={!allItems.length}
+                className='inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white/80 px-3 text-sm text-gray-700 transition-colors hover:border-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200'
+              >
+                <Download className='h-4 w-4' />
+                导出 JSON
+              </button>
+            </div>
           }
         />
 

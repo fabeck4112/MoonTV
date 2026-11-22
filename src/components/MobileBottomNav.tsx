@@ -1,8 +1,18 @@
 'use client';
 
-import { Activity, Film, Home, Library, Search, Tv } from 'lucide-react';
+import {
+  Activity,
+  Film,
+  Home,
+  Library,
+  Search,
+  Settings,
+  Tv,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+import { useAdminRole } from '@/hooks/useAdminRole';
 
 interface MobileBottomNavProps {
   /**
@@ -13,6 +23,7 @@ interface MobileBottomNavProps {
 
 const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
   const pathname = usePathname();
+  const { canManage } = useAdminRole();
 
   // 当前激活路径：优先使用传入的 activePath，否则回退到浏览器地址
   const currentActive = activePath ?? pathname;
@@ -36,6 +47,8 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       label: '源状态',
       href: '/sources',
     },
+    // 仅站长/管理员可见
+    ...(canManage ? [{ icon: Settings, label: '管理', href: '/admin' }] : []),
   ];
 
   const isActive = (href: string) => {
@@ -49,6 +62,7 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
       decodedActive === decodedItemHref ||
       (href === '/library' && decodedActive.startsWith('/library')) ||
       (href === '/sources' && decodedActive.startsWith('/sources')) ||
+      (href === '/admin' && decodedActive.startsWith('/admin')) ||
       (decodedActive.startsWith('/douban') &&
         decodedActive.includes(`type=${typeMatch}`))
     );
@@ -67,7 +81,11 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
         {navItems.map((item) => {
           const active = isActive(item.href);
           return (
-            <li key={item.href} className='w-1/6 flex-shrink-0'>
+            <li
+              key={item.href}
+              className='flex-shrink-0'
+              style={{ width: `${100 / navItems.length}%` }}
+            >
               <Link
                 href={item.href}
                 className='flex h-14 w-full flex-col items-center justify-center gap-1 text-[11px]'

@@ -4,7 +4,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getDoubanCategories } from '@/lib/douban.client';
 import { DoubanItem } from '@/lib/types';
@@ -22,6 +22,10 @@ function DoubanPageClient() {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectorsReady, setSelectorsReady] = useState(false);
+  // 前端筛选（豆瓣 API 不支持年份/评分筛选，仅对已加载数据生效）
+  const [yearFilter, setYearFilter] = useState('all');
+  const [regionFilter, setRegionFilter] = useState('all');
+  const [rateFilter, setRateFilter] = useState('all');
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadingRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,6 +86,40 @@ function DoubanPageClient() {
 
   // 生成骨架屏数据
   const skeletonData = Array.from({ length: 25 }, (_, index) => index);
+
+  // 从已加载数据中提取可筛选的年份 / 地区
+  const yearOptions = useMemo(
+    () =>
+      Array.from(new Set(doubanData.map((item) => item.year).filter(Boolean)))
+        .sort((a, b) => b.localeCompare(a))
+        .slice(0, 30),
+    [doubanData]
+  );
+  const regionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(doubanData.map((item) => item.region).filter(Boolean))
+      ).sort(),
+    [doubanData]
+  );
+
+  // 前端筛选后的数据
+  const filteredData = useMemo(() => {
+    return doubanData.filter((item) => {
+      if (yearFilter !== 'all' && item.year !== yearFilter) return false;
+      if (regionFilter !== 'all' && item.region !== regionFilter) return false;
+      if (rateFilter !== 'all' && item.rate) {
+        const min = Number(rateFilter);
+        if (Number(item.rate) < min) return false;
+      } else if (rateFilter !== 'all' && !item.rate) {
+        return false;
+      }
+      return true;
+    });
+  }, [doubanData, yearFilter, regionFilter, rateFilter]);
+
+  const hasActiveFilter =
+    yearFilter !== 'all' || regionFilter !== 'all' || rateFilter !== 'all';
 
   // 生成API请求参数的辅助函数
   const getRequestParams = useCallback(
@@ -285,6 +323,70 @@ function DoubanPageClient() {
               onSecondaryChange={handleSecondaryChange}
             />
           </div>
+
+          {/* 精细化筛选：年份 / 地区 / 评分（仅对已加载内容生效） */}
+          <div className='flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl bg-white/60 px-4 py-3 text-sm dark:bg-gray-800/40 sm:px-6 border border-gray-200/30 dark:border-gray-700/30 backdrop-blur-sm'>
+            <label className='flex items-center gap-2'>
+              <span className='text-gray-500 dark:text-gray-400'>年份</span>
+              <select
+                value={yearFilter}
+                onChange={(e) => setYearFilter(e.target.value)}
+                className='rounded-lg border border-gray-200 bg-white px-2 py-1 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200'
+              >
+                <option value='all'>全部</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className='flex items-center gap-2'>
+              <span className='text-gray-500 dark:text-gray-400'>地区</span>
+              <select
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value)}
+                className='rounded-lg border border-gray-200 bg-white px-2 py-1 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200'
+              >
+                <option value='all'>全部</option>
+                {regionOptions.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className='flex items-center gap-2'>
+              <span className='text-gray-500 dark:text-gray-400'>评分</span>
+              <select
+                value={rateFilter}
+                onChange={(e) => setRateFilter(e.target.value)}
+                className='rounded-lg border border-gray-200 bg-white px-2 py-1 text-gray-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200'
+              >
+                <option value='all'>全部</option>
+                <option value='8'>8.0 以上</option>
+                <option value='7'>7.0 以上</option>
+                <option value='6'>6.0 以上</option>
+              </select>
+            </label>
+            {hasActiveFilter && (
+              <button
+                onClick={() => {
+                  setYearFilter('all');
+                  setRegionFilter('all');
+                  setRateFilter('all');
+                }}
+                className='ml-auto text-xs text-green-600 hover:underline dark:text-green-400'
+              >
+                重置筛选
+              </button>
+            )}
+            {hasActiveFilter && !loading && (
+              <span className='text-xs text-gray-400'>
+                {filteredData.length} 部
+              </span>
+            )}
+          </div>
         </div>
 
         {/* 内容展示区域 */}
@@ -295,7 +397,7 @@ function DoubanPageClient() {
               ? // 显示骨架屏
                 skeletonData.map((index) => <DoubanCardSkeleton key={index} />)
               : // 显示实际数据
-                doubanData.map((item, index) => (
+                filteredData.map((item, index) => (
                   <div key={`${item.title}-${index}`} className='w-full'>
                     <VideoCard
                       from='douban'
@@ -339,6 +441,11 @@ function DoubanPageClient() {
           {/* 空状态 */}
           {!loading && doubanData.length === 0 && (
             <div className='text-center text-gray-500 py-8'>暂无相关内容</div>
+          )}
+          {!loading && doubanData.length > 0 && filteredData.length === 0 && (
+            <div className='text-center text-gray-500 py-8'>
+              没有符合筛选条件的内容，试试重置筛选
+            </div>
           )}
         </div>
       </div>

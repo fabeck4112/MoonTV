@@ -88,6 +88,8 @@ export interface DoubanItem {
   poster: string;
   rate: string;
   year: string;
+  /** 地区（从豆瓣 card_subtitle 解析，可选） */
+  region?: string;
 }
 
 export interface DoubanResult {

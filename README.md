@@ -20,10 +20,13 @@
 
 ## ✨ 功能特性
 
-- 🔍 **多源聚合搜索**：内置数十个免费资源站点，一次搜索立刻返回全源结果。
+- 🔍 **多源聚合搜索**：内置数十个免费资源站点，一次搜索立刻返回全源结果；支持搜索联想、热门搜索榜，可按类型 / 年份 / 资源源筛选与排序。
 - 📄 **丰富详情页**：支持剧集列表、演员、年份、简介等完整信息展示。
-- ▶️ **流畅在线播放**：集成 HLS.js & ArtPlayer。
-- ❤️ **收藏 + 继续观看**：支持 Redis/D1 存储，多端同步进度。
+- ▶️ **流畅在线播放**：集成 HLS.js & ArtPlayer，支持自动连播、跳过片头片尾、倍速与音量记忆、自定义快捷键、续播提示、画中画与投屏；播放器按需加载，首屏更轻。
+- ❤️ **收藏 + 继续观看**：支持 Redis/D1 存储，多端同步进度；首页继续观看横滑、剧集已看标记与一键跳未看；独立片库页支持收藏与观看记录的搜索、排序、批量删除、导入与导出。
+- 🩺 **数据源健康看板**：实时查看各资源站的可用状态、响应时间与成功率，搜索时自动规避异常源。
+- 📈 **观看统计**：累计时长、本周/本月观影、7 日趋势与常用资源源排行。
+- 🎯 **精细化发现**：豆瓣页按年份 / 地区 / 评分筛选；搜索联想、热搜榜与结果筛选排序、同片多源智能去重。
 - 📱 **PWA**：离线缓存、安装到桌面/主屏，移动端原生体验。
 - 🌗 **响应式布局**：桌面侧边栏 + 移动底部导航，自适应各种屏幕尺寸。
 - 🚀 **极简部署**：一条 Docker 命令即可将完整服务跑起来，或免费部署到 Vercel 和 Cloudflare。
@@ -57,7 +60,7 @@
 | 语言      | TypeScript 4                                                                                          |
 | 播放器    | [ArtPlayer](https://github.com/zhw2590582/ArtPlayer) · [HLS.js](https://github.com/video-dev/hls.js/) |
 | 代码质量  | ESLint · Prettier · Jest                                                                              |
-| 部署      | Docker · Vercel · CloudFlare pages                                                                                 |
+| 部署      | Docker · Vercel · CloudFlare pages                                                                    |
 
 ## 部署
 
@@ -174,25 +177,25 @@ networks:
     driver: bridge
 ```
 
-## 自动同步最近更改
+## 同步上游更新
 
-建议在 fork 的仓库中启用本仓库自带的 GitHub Actions 自动同步功能（见 `.github/workflows/sync.yml`）。
+本仓库已移除自动同步工作流，不再定时从上游合并更新，以避免覆盖本地定制改动。
 
-如需手动同步主仓库更新，也可以使用 GitHub 官方的 [Sync fork](https://docs.github.com/cn/github/collaborating-with-issues-and-pull-requests/syncing-a-fork) 功能。
+如需获取上游的新功能或修复，请使用 GitHub 官方的 [Sync fork](https://docs.github.com/cn/github/collaborating-with-issues-and-pull-requests/syncing-a-fork) 功能手动同步，或按需 cherry-pick 上游提交。同步前建议留意与本地改动的冲突。
 
 ## 环境变量
 
-| 变量                        | 说明                                                        | 可选值                                                  | 默认值                                                                                                                     |
-| --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| USERNAME                    | redis 部署时的管理员账号                                    | 任意字符串                                              | （空）                                                                                                                     |
-| PASSWORD                    | 默认部署时为唯一访问密码，redis 部署时为管理员密码          | 任意字符串                                              | （空）                                                                                                                     |
-| SITE_NAME                   | 站点名称                                                    | 任意字符串                                              | MoonTV                                                                                                                     |
-| ANNOUNCEMENT                | 站点公告                                                    | 任意字符串                                              | 本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。 |
-| NEXT_PUBLIC_STORAGE_TYPE    | 播放记录/收藏的存储方式                                     | localstorage（本地浏览器存储）、redis（仅 docker 支持） | localstorage                                                                                                               |
-| REDIS_URL                   | redis 连接 url，若 NEXT_PUBLIC_STORAGE_TYPE 为 redis 则必填 | 连接 url                                                | 空                                                                                                                         |
-| NEXT_PUBLIC_ENABLE_REGISTER | 是否开放注册，仅在 redis 部署时生效                         | true / false                                            | false                                                                                                                      |
-| NEXT_PUBLIC_SEARCH_MAX_PAGE | 搜索接口可拉取的最大页数                                    | 1-50                                                    | 5                                                                                                                          |
-| NEXT_PUBLIC_IMAGE_PROXY     | 默认的浏览器端图片代理                                      | url prefix                                              | (空)                                                                                                                       |
+| 变量                        | 说明                                                        | 可选值                                                                       | 默认值                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| USERNAME                    | redis 部署时的管理员账号                                    | 任意字符串                                                                   | （空）                                                                                                                     |
+| PASSWORD                    | 默认部署时为唯一访问密码，redis 部署时为管理员密码          | 任意字符串                                                                   | （空）                                                                                                                     |
+| SITE_NAME                   | 站点名称                                                    | 任意字符串                                                                   | MoonTV                                                                                                                     |
+| ANNOUNCEMENT                | 站点公告                                                    | 任意字符串                                                                   | 本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。 |
+| NEXT_PUBLIC_STORAGE_TYPE    | 播放记录/收藏的存储方式                                     | localstorage（本地浏览器存储）、redis（仅 docker 支持）、d1（Cloudflare D1） | localstorage                                                                                                               |
+| REDIS_URL                   | redis 连接 url，若 NEXT_PUBLIC_STORAGE_TYPE 为 redis 则必填 | 连接 url                                                                     | 空                                                                                                                         |
+| NEXT_PUBLIC_ENABLE_REGISTER | 是否开放注册，仅在 redis 部署时生效                         | true / false                                                                 | false                                                                                                                      |
+| NEXT_PUBLIC_SEARCH_MAX_PAGE | 搜索接口可拉取的最大页数                                    | 1-50                                                                         | 5                                                                                                                          |
+| NEXT_PUBLIC_IMAGE_PROXY     | 默认的浏览器端图片代理                                      | url prefix                                                                   | (空)                                                                                                                       |
 
 ## 配置说明
 
@@ -244,6 +247,13 @@ MoonTV 支持标准的苹果 CMS V10 API 格式。
 - [x] 深色模式
 - [x] 持久化存储
 - [x] 多账户
+- [x] 搜索联想、热搜榜与结果筛选排序
+- [x] 播放增强：自动连播、跳过片头片尾、倍速/音量记忆、快捷键
+- [x] 独立片库页：收藏与观看记录的管理与导出
+- [x] 数据源健康看板与异常源自动规避
+- [x] 续播提示、剧集已看标记与画中画/投屏
+- [x] 观看统计与豆瓣精细筛选
+- [x] 播放页按需加载优化体积
 
 ## 安全与隐私提醒
 

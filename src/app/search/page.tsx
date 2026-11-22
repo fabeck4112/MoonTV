@@ -244,15 +244,24 @@ function SearchPageClient() {
   );
 
   const aggregatedResults = useMemo(() => {
+    // 规范化标题：去空格/标点、统一大小写与全半角，提升同片多源的合并率
+    const normalize = (title: string) =>
+      title
+        .normalize('NFKC')
+        .replace(/[\s·・:：\-—_()（）[\]【】]/g, '')
+        .toLowerCase();
+
     const map = new Map<string, SearchResult[]>();
     sortedResults.forEach((item) => {
-      const key = `${item.title.replaceAll(' ', '')}-${
-        item.year || 'unknown'
-      }-${item.episodes.length === 1 ? 'movie' : 'tv'}`;
+      const key = `${normalize(item.title)}-${item.year || 'unknown'}-${
+        item.episodes.length === 1 ? 'movie' : 'tv'
+      }`;
       const arr = map.get(key) || [];
       arr.push(item);
       map.set(key, arr);
     });
+    // sortedResults 保留了接口按源健康度的返回顺序（稳定排序），
+    // 因此组内首项即最可用源，VideoCard 取 items[0] 展示/跳转即可。
     return Array.from(map.entries());
   }, [sortedResults]);
 

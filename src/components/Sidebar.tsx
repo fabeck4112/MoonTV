@@ -2,12 +2,14 @@
 
 import {
   Activity,
+  BarChart3,
   Clover,
   Film,
   Home,
   Library,
   Menu,
   Search,
+  Settings,
   Tv,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -20,6 +22,8 @@ import {
   useLayoutEffect,
   useState,
 } from 'react';
+
+import { useAdminRole } from '@/hooks/useAdminRole';
 
 import { useSite } from './SiteProvider';
 
@@ -64,6 +68,7 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { canManage } = useAdminRole();
   // 若同一次 SPA 会话中已经读取过折叠状态，则直接复用，避免闪烁
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (
@@ -153,10 +158,17 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
       href: '/library',
     },
     {
+      icon: BarChart3,
+      label: '观看统计',
+      href: '/stats',
+    },
+    {
       icon: Activity,
       label: '数据源健康',
       href: '/sources',
     },
+    // 仅站长/管理员可见，普通用户与 localstorage 模式不展示
+    ...(canManage ? [{ icon: Settings, label: '管理', href: '/admin' }] : []),
   ];
 
   return (
@@ -255,6 +267,10 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                       decodedActive.startsWith('/library')) ||
                     (item.href === '/sources' &&
                       decodedActive.startsWith('/sources')) ||
+                    (item.href === '/stats' &&
+                      decodedActive.startsWith('/stats')) ||
+                    (item.href === '/admin' &&
+                      decodedActive.startsWith('/admin')) ||
                     (decodedActive.startsWith('/douban') &&
                       decodedActive.includes(`type=${typeMatch}`) &&
                       tagMatch &&

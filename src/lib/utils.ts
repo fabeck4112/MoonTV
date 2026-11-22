@@ -52,6 +52,36 @@ export function cleanHtmlTags(text: string): string {
 }
 
 /**
+ * 从豆瓣 card_subtitle（如 "中国大陆 / 剧情 / 2024"）解析出地区。
+ * 取第一段并归类到常见地区，便于前端筛选。
+ */
+export function parseDoubanRegion(cardSubtitle?: string): string {
+  if (!cardSubtitle) return '';
+  // 按 / 分段，跳过纯年份段（部分条目以年份开头）
+  const segments = cardSubtitle
+    .split('/')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const groups: { names: string[]; label: string }[] = [
+    {
+      names: ['中国大陆', '中国香港', '中国台湾', '华语', '国产'],
+      label: '华语',
+    },
+    { names: ['美国', '英国', '法国', '德国', '欧洲', '欧美'], label: '欧美' },
+    { names: ['韩国'], label: '韩国' },
+    { names: ['日本'], label: '日本' },
+    { names: ['印度', '泰国', '新加坡', '东南亚'], label: '其他' },
+  ];
+  for (const segment of segments) {
+    if (/^\d{4}$/.test(segment)) continue;
+    for (const group of groups) {
+      if (group.names.some((n) => segment.includes(n))) return group.label;
+    }
+  }
+  return '';
+}
+
+/**
  * 从m3u8地址获取视频质量等级和网络信息
  * @param m3u8Url m3u8播放列表的URL
  * @returns Promise<{quality: string, loadSpeed: string, pingTime: number}> 视频质量等级和网络信息
