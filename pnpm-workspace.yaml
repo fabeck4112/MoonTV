@@ -1,0 +1,14 @@
+# pnpm 10 起，overrides 等设置从 package.json 迁移到本文件。
+# 以下为针对传递依赖中高危漏洞的同 major 版本安全升级（不改变 API）。
+overrides:
+  minimatch@<3.1.3: 3.1.3
+  semver@<7.7.2: 7.7.2
+  js-yaml@<3.14.2: 3.14.2
+  nanoid@<3.3.16: 3.3.16
+  ws@<8.20.1: 8.20.1
+  postcss@<8.5.10: 8.5.10
+  brace-expansion@<1.1.13: 1.1.13
+  flatted@<3.4.0: 3.4.0
+  form-data@<3.0.4: 3.0.4
+  fast-uri@<3.1.9: 3.1.9
+  tar@<7.5.7: 7.5.7

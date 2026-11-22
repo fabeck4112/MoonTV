@@ -189,6 +189,21 @@
     "lzi": {
       "api": "https://cj.lziapi.com/api.php/provide/vod",
       "name": "量子资源站"
+    },
+    "jinyingdd": {
+      "api": "https://jinyingzy.com/api.php/provide/vod",
+      "name": "金鹰点播",
+      "detail": "https://jinyingzy.com"
+    },
+    "haohua": {
+      "api": "https://hhzyapi.com/api.php/provide/vod",
+      "name": "豪华资源",
+      "detail": "https://hhzyapi.com"
+    },
+    "maoyan": {
+      "api": "https://api.maoyanapi.top/api.php/provide/vod",
+      "name": "猫眼资源",
+      "detail": "https://api.maoyanapi.top"
     }
   }
 }

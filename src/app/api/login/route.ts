@@ -1,8 +1,15 @@
-/* eslint-disable no-console,@typescript-eslint/no-explicit-any */
+/* eslint-disable no-console */
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
+import {
+  authCookieClearOptions,
+  authCookieOptions,
+  createAuthToken,
+  LOCAL_USER,
+  usernameCookieOptions,
+} from '@/lib/session';
 
 export const runtime = 'edge';
 
@@ -14,57 +21,6 @@ const STORAGE_TYPE =
     | 'd1'
     | undefined) || 'localstorage';
 
-// 生成签名
-async function generateSignature(
-  data: string,
-  secret: string
-): Promise<string> {
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secret);
-  const messageData = encoder.encode(data);
-
-  // 导入密钥
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  // 生成签名
-  const signature = await crypto.subtle.sign('HMAC', key, messageData);
-
-  // 转换为十六进制字符串
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-// 生成认证Cookie（带签名）
-async function generateAuthCookie(
-  username?: string,
-  password?: string,
-  includePassword = false
-): Promise<string> {
-  const authData: any = {};
-
-  // 只在需要时包含 password
-  if (includePassword && password) {
-    authData.password = password;
-  }
-
-  if (username && process.env.PASSWORD) {
-    authData.username = username;
-    // 使用密码作为密钥对用户名进行签名
-    const signature = await generateSignature(username, process.env.PASSWORD);
-    authData.signature = signature;
-    authData.timestamp = Date.now(); // 添加时间戳防重放攻击
-  }
-
-  return encodeURIComponent(JSON.stringify(authData));
-}
-
 export async function POST(req: NextRequest) {
   try {
     // 本地 / localStorage 模式——仅校验固定密码
@@ -74,16 +30,7 @@ export async function POST(req: NextRequest) {
       // 未配置 PASSWORD 时直接放行
       if (!envPassword) {
         const response = NextResponse.json({ ok: true });
-
-        // 清除可能存在的认证cookie
-        response.cookies.set('auth', '', {
-          path: '/',
-          expires: new Date(0),
-          sameSite: 'lax', // 改为 lax 以支持 PWA
-          httpOnly: false, // PWA 需要客户端可访问
-          secure: false, // 根据协议自动设置
-        });
-
+        clearAuthCookies(response);
         return response;
       }
 
@@ -99,21 +46,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 验证成功，设置认证cookie
-      const response = NextResponse.json({ ok: true });
-      const cookieValue = await generateAuthCookie(undefined, password, true); // localstorage 模式包含 password
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 7); // 7天过期
-
-      response.cookies.set('auth', cookieValue, {
-        path: '/',
-        expires,
-        sameSite: 'lax', // 改为 lax 以支持 PWA
-        httpOnly: false, // PWA 需要客户端可访问
-        secure: false, // 根据协议自动设置
-      });
-
-      return response;
+      return await issueAuth(LOCAL_USER, envPassword);
     }
 
     // 数据库 / redis 模式——校验用户名并尝试连接数据库
@@ -126,26 +59,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '密码不能为空' }, { status: 400 });
     }
 
+    const secret = process.env.PASSWORD || '';
+
     // 可能是站长，直接读环境变量
     if (
       username === process.env.USERNAME &&
       password === process.env.PASSWORD
     ) {
-      // 验证成功，设置认证cookie
-      const response = NextResponse.json({ ok: true });
-      const cookieValue = await generateAuthCookie(username, password, false); // 数据库模式不包含 password
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 7); // 7天过期
-
-      response.cookies.set('auth', cookieValue, {
-        path: '/',
-        expires,
-        sameSite: 'lax', // 改为 lax 以支持 PWA
-        httpOnly: false, // PWA 需要客户端可访问
-        secure: false, // 根据协议自动设置
-      });
-
-      return response;
+      return await issueAuth(username, secret);
     } else if (username === process.env.USERNAME) {
       return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
     }
@@ -165,22 +86,7 @@ export async function POST(req: NextRequest) {
           { status: 401 }
         );
       }
-
-      // 验证成功，设置认证cookie
-      const response = NextResponse.json({ ok: true });
-      const cookieValue = await generateAuthCookie(username, password, false); // 数据库模式不包含 password
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 7); // 7天过期
-
-      response.cookies.set('auth', cookieValue, {
-        path: '/',
-        expires,
-        sameSite: 'lax', // 改为 lax 以支持 PWA
-        httpOnly: false, // PWA 需要客户端可访问
-        secure: false, // 根据协议自动设置
-      });
-
-      return response;
+      return await issueAuth(username, secret);
     } catch (err) {
       console.error('数据库验证失败', err);
       return NextResponse.json({ error: '数据库错误' }, { status: 500 });
@@ -189,4 +95,44 @@ export async function POST(req: NextRequest) {
     console.error('登录接口异常', error);
     return NextResponse.json({ error: '服务器错误' }, { status: 500 });
   }
+}
+
+/** 签发认证 cookie：auth(httpOnly) + username(前端可读，非敏感) */
+async function issueAuth(user: string, secret: string): Promise<NextResponse> {
+  const response = NextResponse.json({ ok: true });
+  const expires = new Date();
+  expires.setDate(expires.getDate() + 7); // 7天过期
+
+  // auth cookie 只含签名 token，不含任何密码；httpOnly 前端不可读
+  response.cookies.set(
+    'auth',
+    await createAuthToken(user, secret),
+    authCookieOptions(expires)
+  );
+
+  // username 非敏感，供前端展示当前用户 / 生成缓存 key
+  // localstorage 模式不写 username（保持匿名语义）
+  if (user !== LOCAL_USER) {
+    response.cookies.set(
+      'username',
+      encodeURIComponent(user),
+      usernameCookieOptions(expires)
+    );
+  } else {
+    response.cookies.set('username', '', {
+      ...usernameCookieOptions(expires),
+      expires: new Date(0),
+    });
+  }
+
+  return response;
+}
+
+/** 清除所有认证相关 cookie */
+function clearAuthCookies(response: NextResponse): void {
+  response.cookies.set('auth', '', authCookieClearOptions());
+  response.cookies.set('username', '', {
+    ...usernameCookieOptions(new Date()),
+    expires: new Date(0),
+  });
 }

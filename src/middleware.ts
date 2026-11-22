@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
+import { LOCAL_USER, verifyAuthToken } from '@/lib/session';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,79 +20,66 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 从cookie获取认证信息
-  const authInfo = getAuthInfoFromCookie(request);
-
-  if (!authInfo) {
+  const authCookie = request.cookies.get('auth');
+  if (!authCookie) {
     return handleAuthFailure(request, pathname);
   }
 
-  // localstorage模式：在middleware中完成验证
-  if (storageType === 'localstorage') {
-    if (!authInfo.password || authInfo.password !== process.env.PASSWORD) {
-      return handleAuthFailure(request, pathname);
-    }
-    return NextResponse.next();
-  }
-
-  // 其他模式：只验证签名
-  // 检查是否有用户名（非localStorage模式下密码不存储在cookie中）
-  if (!authInfo.username || !authInfo.signature) {
-    return handleAuthFailure(request, pathname);
-  }
-
-  // 验证签名（如果存在）
-  if (authInfo.signature) {
-    const isValidSignature = await verifySignature(
-      authInfo.username,
-      authInfo.signature,
-      process.env.PASSWORD || ''
-    );
-
-    // 签名验证通过即可
-    if (isValidSignature) {
+  // 优先校验新版签名 token（含过期时间，防重放）
+  const result = await verifyAuthToken(
+    authCookie.value,
+    process.env.PASSWORD || ''
+  );
+  if (result.ok) {
+    // DB 模式必须持有真实用户名签发的 token；
+    // localstorage 模式使用固定标识 LOCAL_USER。
+    if (storageType === 'localstorage' || result.user !== LOCAL_USER) {
       return NextResponse.next();
     }
   }
 
-  // 签名验证失败或不存在签名
+  // 兼容旧 cookie：仅允许 DB 模式下带合法 HMAC 签名的历史会话平滑过渡
+  // （旧 localstorage cookie 含明文密码，出于安全不再兼容，需重新登录）
+  if (storageType !== 'localstorage') {
+    const authInfo = getAuthInfoFromCookie(request);
+    if (authInfo?.username && authInfo.signature && authInfo.timestamp) {
+      const valid = await verifyLegacySignature(
+        authInfo.username,
+        authInfo.signature,
+        process.env.PASSWORD || ''
+      );
+      if (valid) return NextResponse.next();
+    }
+  }
+
   return handleAuthFailure(request, pathname);
 }
 
-// 验证签名
-async function verifySignature(
+// 旧版签名校验：HMAC(username, PASSWORD)
+async function verifyLegacySignature(
   data: string,
   signature: string,
   secret: string
 ): Promise<boolean> {
   const encoder = new TextEncoder();
-  const keyData = encoder.encode(secret);
-  const messageData = encoder.encode(data);
-
   try {
-    // 导入密钥
     const key = await crypto.subtle.importKey(
       'raw',
-      keyData,
+      encoder.encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify']
     );
-
-    // 将十六进制字符串转换为Uint8Array
     const signatureBuffer = new Uint8Array(
       signature.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
     );
-
-    // 验证签名
     return await crypto.subtle.verify(
       'HMAC',
       key,
       signatureBuffer,
-      messageData
+      encoder.encode(data)
     );
-  } catch (error) {
-    console.error('签名验证失败:', error);
+  } catch {
     return false;
   }
 }

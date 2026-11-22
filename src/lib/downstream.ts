@@ -1,3 +1,8 @@
+import {
+  isCircuitOpen,
+  recordFailure,
+  recordSuccess,
+} from '@/lib/circuit-breaker';
 import { API_CONFIG, ApiSite, getConfig } from '@/lib/config';
 import { SearchResult } from '@/lib/types';
 import { cleanHtmlTags } from '@/lib/utils';
@@ -19,6 +24,9 @@ export async function searchFromApi(
   apiSite: ApiSite,
   query: string
 ): Promise<SearchResult[]> {
+  // 入口处二次检查熔断（其他调用方如 search/one 也可能触发）
+  if (isCircuitOpen(apiSite.key)) return [];
+
   try {
     const apiBaseUrl = apiSite.api;
     const apiUrl =
@@ -37,6 +45,7 @@ export async function searchFromApi(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      recordFailure(apiSite.key);
       return [];
     }
 
@@ -47,8 +56,12 @@ export async function searchFromApi(
       !Array.isArray(data.list) ||
       data.list.length === 0
     ) {
+      // 正常返回但无结果（该源确实没有此资源），不算失败
+      recordSuccess(apiSite.key);
       return [];
     }
+    // 接口可用，重置失败计数
+    recordSuccess(apiSite.key);
     // 处理第一页结果
     const results = data.list.map((item: ApiSearchItem) => {
       let episodes: string[] = [];
@@ -183,6 +196,8 @@ export async function searchFromApi(
 
     return results;
   } catch (error) {
+    // 网络错误 / 超时 / 响应解析失败，计入熔断
+    recordFailure(apiSite.key);
     return [];
   }
 }
